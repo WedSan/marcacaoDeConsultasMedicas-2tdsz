@@ -6,42 +6,28 @@ import theme from '../styles/theme';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootStackParamList } from '../types';
+import * as Notifications from 'expo-notifications';
+import { SchedulableTriggerInputTypes } from 'expo-notifications';
+import { Appointment } from '../types/Appointment';
+import { Alert } from 'react-native';
 
 type CreateAppointmentScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'CreateAppointment'>;
 };
 
 const CreateAppointmentScreen: React.FC<CreateAppointmentScreenProps> = ({ navigation }) => {
-  const handleSubmit = async (appointment: {
-    doctorId: string;
-    date: Date;
-    time: string;
-    description: string;
-  }) => {
-    try {
-      // Recuperar consultas existentes
-      const existingAppointments = await AsyncStorage.getItem('appointments');
-      const appointments = existingAppointments ? JSON.parse(existingAppointments) : [];
-
-      // Adicionar nova consulta
-      const newAppointment = {
-        id: Date.now().toString(),
-        ...appointment,
-        status: 'pending',
-      };
-
-      appointments.push(newAppointment);
-
-      // Salvar no AsyncStorage
-      await AsyncStorage.setItem('appointments', JSON.stringify(appointments));
-
-      // Navegar de volta para a tela inicial
-      navigation.navigate('Home');
-    } catch (error) {
-      console.error('Erro ao salvar consulta:', error);
-      alert('Erro ao salvar a consulta. Tente novamente.');
-    }
-  };
+   const saveAppointment = async (appointment: Appointment) => {
+     try {
+       const storedAppointments = await AsyncStorage.getItem('appointments');
+       const parsedAppointments = storedAppointments ? JSON.parse(storedAppointments) : [];
+       const updatedAppointments = [...parsedAppointments, appointment];
+       await AsyncStorage.setItem('appointments', JSON.stringify(updatedAppointments));
+       Alert.alert('Sucesso', 'Consulta agendada com sucesso!');
+     } catch (error) {
+       console.error('Erro ao salvar consulta:', error);
+       Alert.alert('Erro', 'Não foi possível salvar a consulta.');
+     }
+   };
 
   return (
     <Container>
@@ -50,7 +36,7 @@ const CreateAppointmentScreen: React.FC<CreateAppointmentScreenProps> = ({ navig
       </HeaderContainer>
 
       <Content>
-        <AppointmentForm onSubmit={handleSubmit} />
+        <AppointmentForm onSubmit={saveAppointment} />
       </Content>
     </Container>
   );

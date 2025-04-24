@@ -1,9 +1,10 @@
 import React from 'react';
 import styled from 'styled-components/native';
-import { Button } from 'react-native-elements';
+import { Button, Text } from 'react-native-elements';
 import { HeaderContainer, HeaderTitle } from '../components/Header';
 import theme from '../styles/theme';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useAuthentication } from '../components/context/AuthenticationContext';
 
 type RootStackParamList = {
   Home: undefined;
@@ -16,6 +17,8 @@ type ProfileScreenProps = {
 };
 
 const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
+
+  const {user} = useAuthentication();
   return (
     <Container>
       <HeaderContainer>
@@ -42,8 +45,8 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 
         <ProfileInfo>
           <Avatar source={{ uri: 'https://via.placeholder.com/150' }} />
-          <Name>Nome do Usuário</Name>
-          <Email>usuario@email.com</Email>
+          <Name>Nome do Usuário:{' '} <Text style={{textTransform: 'uppercase', fontWeight: 'bold'}}>{user?.name}</Text></Name>
+          <Email>{user?.email}</Email>
         </ProfileInfo>
       </Content>
     </Container>

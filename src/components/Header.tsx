@@ -18,3 +18,11 @@ export const HeaderTitle = styled.Text`
   font-size: ${theme.typography.title.fontSize}px;
   font-weight: ${theme.typography.title.fontWeight};
 `;
+
+export const Header: React.FC<{ title: string }> = ({ title }) => {
+  return (
+    <HeaderContainer>
+      <HeaderTitle>{title}</HeaderTitle>
+    </HeaderContainer>
+  );
+};

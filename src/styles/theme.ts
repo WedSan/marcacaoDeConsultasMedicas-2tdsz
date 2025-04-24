@@ -1,12 +1,16 @@
 export default {
    colors: {
-      primary: '#2A86FF',
-      secondary: '#00C48C',
-      background: '#F5F5F5',
-      text: '#333333',
-      error: '#FF647C',
-      success: '#00C48C',
+      primary: '#FCB454',
+      secondary: '#F16767',
+      background: '#FFF085',
+      text: '#212529',
+      textLight: '#6C757D',
+      inputBackground: '#FFFFFF',
+      error: '#F93827',
+      success: '#16C47F',
+      warning: '#FFC107',
       white: '#FFFFFF',
+      border: '#DEE2E6',
    },
    typography: {
       title: {
@@ -15,15 +19,21 @@ export default {
       },
       subtitle: {
          fontSize: 18,
-         fontWeight: '500',
+         fontWeight: '600',
       },
       body: {
          fontSize: 16,
+         fontWeight: 'normal',
+      },
+      caption: {
+         fontSize: 14,
+         fontWeight: 'normal',
       },
    },
    spacing: {
       small: 8,
       medium: 16,
       large: 24,
+      xlarge: 32,
    },
 };

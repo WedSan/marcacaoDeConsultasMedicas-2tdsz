@@ -1,189 +1,191 @@
 import React, { useState } from 'react';
 import styled from 'styled-components/native';
 import { Button, Input, Text } from 'react-native-elements';
-import { Platform, View, TouchableOpacity } from 'react-native';
+import { Platform, View, TouchableOpacity, Alert } from 'react-native';
 import theme from '../styles/theme';
-import { Doctor } from '../types';
+import { fakeDoctors as doctors, fakeDoctors } from '../fake-data/data'; 
+import * as yup from 'yup';
+import { Formik } from 'formik';
+import { Appointment } from '../types/Appointment';
+import { useAuthentication } from './context/AuthenticationContext';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../types/Navigator';
+import { useNavigation } from '@react-navigation/native';
 
-const doctors: Doctor[] = [
-   {
-      id: '1',
-      name: 'Dr. João Silva',
-      specialty: 'Cardiologista',
-      image: 'https://mighty.tools/mockmind-api/content/human/91.jpg',
-   },
-   {
-      id: '2',
-      name: 'Dra. Maria Santos',
-      specialty: 'Dermatologista',
-      image: 'https://mighty.tools/mockmind-api/content/human/97.jpg',
-   },
-   {
-      id: '3',
-      name: 'Dr. Pedro Oliveira',
-      specialty: 'Oftalmologista',
-      image: 'https://mighty.tools/mockmind-api/content/human/79.jpg',
-   },
-];
+interface AppointmentFormProps {
+   onSubmit: (appointment: Appointment) => Promise<void>;
+};
 
-type AppointmentFormProps = {
-   onSubmit: (appointment: {
-      doctorId: string;
-      date: Date;
-      time: string;
-      description: string;
-   }) => void;
+type AppointmenFormNavigationProps = {
+  navigation: NativeStackNavigationProp<RootStackParamList, 'Home'>;
 };
 
 const generateTimeSlots = () => {
-   const slots = [];
-   for (let hour = 9; hour < 18; hour++) {
-      slots.push(`${hour.toString().padStart(2, '0')}:00`);
-      slots.push(`${hour.toString().padStart(2, '0')}:30`);
-   }
-   return slots;
+  const slots = [];
+  for (let hour = 9; hour < 18; hour++) {
+    slots.push(`${hour.toString().padStart(2, '0')}:00`);
+    slots.push(`${hour.toString().padStart(2, '0')}:30`);
+  }
+  return slots;
 };
 
-const AppointmentForm: React.FC<AppointmentFormProps> = ({ onSubmit }) => {
-   const [selectedDoctor, setSelectedDoctor] = useState<string>('');
-   const [dateInput, setDateInput] = useState('');
-   const [selectedTime, setSelectedTime] = useState<string>('');
-   const [description, setDescription] = useState('');
-   const timeSlots = generateTimeSlots();
-
-   const validateDate = (inputDate: string) => {
-      const dateRegex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
-      const match = inputDate.match(dateRegex);
-
-      if (!match) return false;
-
-      const [, day, month, year] = match;
+const validationSchema = yup.object().shape({
+  doctorId: yup.string().required('Selecione um médico.'),
+  date: yup
+    .string()
+    .required('A data é obrigatória.')
+    .matches(
+      /^(\d{2})\/(\d{2})\/(\d{4})$/,
+      'A data deve estar no formato DD/MM/AAAA.'
+    )
+    .test('valid-date', 'Insira uma data válida.', (value) => {
+      if (!value) return false;
+      const [day, month, year] = value.split('/');
       const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
       const today = new Date();
       const maxDate = new Date(new Date().setMonth(new Date().getMonth() + 3));
-
       return date >= today && date <= maxDate;
-   };
+    }),
+  time: yup.string().required('Selecione um horário.'),
+  description: yup
+    .string()
+    .required('A descrição é obrigatória.')
+    .min(10, 'A descrição deve ter pelo menos 10 caracteres.'),
+});
 
-   const handleDateChange = (text: string) => {
-      // Remove todos os caracteres não numéricos
-      const numbers = text.replace(/\D/g, '');
-      
-      // Formata a data enquanto digita
-      let formattedDate = '';
-      if (numbers.length > 0) {
-         if (numbers.length <= 2) {
-            formattedDate = numbers;
-         } else if (numbers.length <= 4) {
-            formattedDate = `${numbers.slice(0, 2)}/${numbers.slice(2)}`;
-         } else {
-            formattedDate = `${numbers.slice(0, 2)}/${numbers.slice(2, 4)}/${numbers.slice(4, 8)}`;
-         }
-      }
+const AppointmentForm: React.FC<AppointmentFormProps> = ({ onSubmit }) => {
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const navigation = useNavigation<AppointmenFormNavigationProps["navigation"]>();
+  const timeSlots = generateTimeSlots();
+  
+  const {user} = useAuthentication()
 
-      setDateInput(formattedDate);
-   };
-
-   const handleSubmit = () => {
-      if (!selectedDoctor || !selectedTime || !description) {
-         alert('Por favor, preencha todos os campos');
-         return;
-      }
-
-      if (!validateDate(dateInput)) {
-         alert('Por favor, insira uma data válida (DD/MM/AAAA)');
-         return;
-      }
-
-      const [day, month, year] = dateInput.split('/');
-      const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-
-      onSubmit({
-         doctorId: selectedDoctor,
-         date,
-         time: selectedTime,
-         description,
-      });
-   };
-
-   const isTimeSlotAvailable = (time: string) => {
-      // Aqui você pode adicionar lógica para verificar se o horário está disponível
-      // Por exemplo, verificar se já existe uma consulta agendada para este horário
-      return true;
-   };
-
-   return (
-      <Container>
-         <Title>Selecione o Médico</Title>
-         <DoctorList>
+  return (
+    <Formik
+      initialValues={{
+        doctorId: '',
+        date: '',
+        time: '',
+        description: '',
+      }}
+      validationSchema={validationSchema}
+      onSubmit={(values, { resetForm }) => {
+        const currentDoctor = fakeDoctors.find(d=>d.id == values.doctorId)
+        const newAppointment = {
+          id: Math.random().toString(36).substr(2, 9),
+          doctorId: values.doctorId,
+          doctorName: currentDoctor!.name,
+          patientId: user!.id,
+          patientName: user!.name,
+          specialty: currentDoctor!.specialty!,
+          status: 'pending' as 'pending',
+          date: values.time,
+          time: values.time,
+          description: values.description,
+        };
+        resetForm();
+        navigation.navigate("Home");
+        onSubmit(newAppointment);
+      }}
+    >
+      {({
+        handleChange,
+        handleBlur,
+        handleSubmit,
+        values,
+        errors,
+        touched,
+        setFieldValue,
+      }) => (
+        <Container>
+          <Title>Selecione o Médico</Title>
+          <DoctorList>
             {doctors.map((doctor) => (
-               <DoctorCard
-                  key={doctor.id}
-                  selected={selectedDoctor === doctor.id}
-                  onPress={() => setSelectedDoctor(doctor.id)}
-               >
-                  <DoctorImage source={{ uri: doctor.image }} />
-                  <DoctorInfo>
-                     <DoctorName>{doctor.name}</DoctorName>
-                     <DoctorSpecialty>{doctor.specialty}</DoctorSpecialty>
-                  </DoctorInfo>
-               </DoctorCard>
+              <DoctorCard
+                key={doctor.id}
+                selected={values.doctorId === doctor.id}
+                onPress={() => setFieldValue('doctorId', doctor.id)}
+              >
+                <DoctorImage source={{ uri: doctor.image }} />
+                <DoctorInfo>
+                  <DoctorName>{doctor.name}</DoctorName>
+                  <DoctorSpecialty>{doctor.specialty}</DoctorSpecialty>
+                </DoctorInfo>
+              </DoctorCard>
             ))}
-         </DoctorList>
+          </DoctorList>
+          {touched.doctorId && errors.doctorId && (
+            <Text style={{ color: 'red' }}>{errors.doctorId}</Text>
+          )}
 
-         <Title>Data e Hora</Title>
-         <Input
+          <Title>Data e Hora</Title>
+          <Input
             placeholder="Data (DD/MM/AAAA)"
-            value={dateInput}
-            onChangeText={handleDateChange}
+            value={values.date}
+            onChangeText={handleChange('date')}
+            onBlur={handleBlur('date')}
             keyboardType="numeric"
             maxLength={10}
             containerStyle={InputContainer}
-            errorMessage={dateInput && !validateDate(dateInput) ? 'Data inválida' : undefined}
-         />
+            errorMessage={touched.date && typeof errors.date === 'string' ? errors.date : undefined}
+          />
 
-         <TimeSlotsContainer>
+          <TimeSlotsContainer>
             <TimeSlotsTitle>Horários Disponíveis:</TimeSlotsTitle>
             <TimeSlotsGrid>
-               {timeSlots.map((time) => {
-                  const isAvailable = isTimeSlotAvailable(time);
-                  return (
-                     <TimeSlotButton
-                        key={time}
-                        selected={selectedTime === time}
-                        disabled={!isAvailable}
-                        onPress={() => isAvailable && setSelectedTime(time)}
-                     >
-                        <TimeSlotText selected={selectedTime === time} disabled={!isAvailable}>
-                           {time}
-                        </TimeSlotText>
-                     </TimeSlotButton>
-                  );
-               })}
+              {timeSlots.map((time) => {
+                const isAvailable = true; 
+                return (
+                  <TimeSlotButton
+                    key={time}
+                    selected={values.time === time}
+                    disabled={!isAvailable}
+                    onPress={() => isAvailable && setFieldValue('time', time)}
+                  >
+                    <TimeSlotText
+                      selected={values.time === time}
+                      disabled={!isAvailable}
+                    >
+                      {time}
+                    </TimeSlotText>
+                  </TimeSlotButton>
+                );
+              })}
             </TimeSlotsGrid>
-         </TimeSlotsContainer>
+          </TimeSlotsContainer>
+          {touched.time && errors.time && (
+            <Text style={{ color: 'red' }}>{errors.time}</Text>
+          )}
 
-         <Input
+          <Input
             placeholder="Descrição da consulta"
-            value={description}
-            onChangeText={setDescription}
+            value={values.description}
+            onChangeText={handleChange('description')}
+            onBlur={handleBlur('description')}
             multiline
             numberOfLines={4}
             containerStyle={InputContainer}
-         />
+            errorMessage={
+              touched.description && errors.description
+                ? errors.description
+                : undefined
+            }
+          />
 
-         <SubmitButton
+          <SubmitButton
             title="Agendar Consulta"
-            onPress={handleSubmit}
+            onPress={handleSubmit as any}
             buttonStyle={{
-               backgroundColor: theme.colors.primary,
-               borderRadius: 8,
-               padding: 12,
-               marginTop: 20,
+              backgroundColor: theme.colors.primary,
+              borderRadius: 8,
+              padding: 12,
+              marginTop: 20,
             }}
-         />
-      </Container>
-   );
+          />
+        </Container>
+      )}
+    </Formik>
+  );
 };
 
 const Container = styled.View`
@@ -294,4 +296,4 @@ const SubmitButton = styled(Button)`
   margin-top: ${theme.spacing.large}px;
 `;
 
-export default AppointmentForm; 
+export default AppointmentForm;
